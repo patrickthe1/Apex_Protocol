@@ -1,0 +1,144 @@
+"use client"
+
+import type React from "react"
+
+import { useState } from "react"
+import { Button } from "@/components/ui/button"
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { Input } from "@/components/ui/input"
+import { Label } from "@/components/ui/label"
+import { Shield, ArrowLeft, Key, CheckCircle, XCircle } from "lucide-react"
+import Link from "next/link"
+
+export default function AdminAccessPage() {
+  const [adminCode, setAdminCode] = useState("")
+  const [status, setStatus] = useState<"idle" | "success" | "error">("idle")
+  const [message, setMessage] = useState("")
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault()
+
+    // Mock admin code validation
+    if (adminCode === "APEX_ADMIN_2024") {
+      setStatus("success")
+      setMessage("Admin privileges activated. You now have full administrative access.")
+      localStorage.setItem("isAdmin", "true")
+    } else {
+      setStatus("error")
+      setMessage("Invalid admin code. Access denied.")
+    }
+  }
+
+  return (
+    <div className="min-h-screen bg-gradient-to-br from-slate-950 via-slate-900 to-slate-950 flex items-center justify-center p-4">
+      <div className="w-full max-w-md">
+        {/* Header */}
+        <div className="text-center mb-8">
+          <Link href="/dashboard" className="inline-flex items-center space-x-2 text-blue-400 hover:text-blue-300 mb-6">
+            <ArrowLeft className="h-4 w-4" />
+            <span>Back to Dashboard</span>
+          </Link>
+          <div className="flex items-center justify-center space-x-2 mb-4">
+            <Shield className="h-8 w-8 text-blue-400" />
+            <span className="text-2xl font-bold text-white">Apex Protocol</span>
+          </div>
+          <h1 className="text-3xl font-bold text-white mb-2">Admin Access</h1>
+          <p className="text-slate-400">Enter administrative credentials to access system controls</p>
+        </div>
+
+        {/* Admin Access Form */}
+        <Card className="bg-slate-800/50 border-slate-700 backdrop-blur-sm">
+          <CardHeader>
+            <CardTitle className="text-white text-center flex items-center justify-center space-x-2">
+              <Key className="h-5 w-5" />
+              <span>Administrative Access</span>
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            {status === "idle" && (
+              <form onSubmit={handleSubmit} className="space-y-6">
+                <div className="space-y-2">
+                  <Label htmlFor="adminCode" className="text-slate-300">
+                    Admin Secret Code
+                  </Label>
+                  <Input
+                    id="adminCode"
+                    type="password"
+                    value={adminCode}
+                    onChange={(e) => setAdminCode(e.target.value)}
+                    className="bg-slate-700/50 border-slate-600 text-white placeholder:text-slate-400 focus:border-red-500 text-center tracking-widest"
+                    placeholder="Enter admin code..."
+                    required
+                  />
+                  <p className="text-slate-500 text-sm text-center">
+                    Administrative codes are restricted to authorized personnel only
+                  </p>
+                </div>
+
+                <Button
+                  type="submit"
+                  className="w-full bg-red-600 hover:bg-red-700 text-white py-3"
+                  disabled={!adminCode.trim()}
+                >
+                  Activate Admin Access
+                </Button>
+              </form>
+            )}
+
+            {status === "success" && (
+              <div className="text-center space-y-4">
+                <CheckCircle className="h-16 w-16 text-green-400 mx-auto" />
+                <h3 className="text-xl font-semibold text-white">Admin Access Granted</h3>
+                <p className="text-slate-300">{message}</p>
+                <Link href="/dashboard">
+                  <Button className="w-full bg-green-600 hover:bg-green-700 text-white">Return to Dashboard</Button>
+                </Link>
+              </div>
+            )}
+
+            {status === "error" && (
+              <div className="text-center space-y-4">
+                <XCircle className="h-16 w-16 text-red-400 mx-auto" />
+                <h3 className="text-xl font-semibold text-white">Access Denied</h3>
+                <p className="text-slate-300">{message}</p>
+                <Button
+                  onClick={() => {
+                    setStatus("idle")
+                    setAdminCode("")
+                    setMessage("")
+                  }}
+                  variant="outline"
+                  className="w-full border-slate-600 text-slate-300 hover:bg-slate-700"
+                >
+                  Try Again
+                </Button>
+              </div>
+            )}
+
+            <div className="mt-6 p-4 bg-red-900/20 border border-red-600/30 rounded-lg">
+              <h4 className="text-red-400 font-medium mb-2">⚠️ Security Notice</h4>
+              <p className="text-slate-400 text-sm">
+                Administrative access provides full system control including user management, content moderation, and
+                system configuration. Unauthorized access attempts are logged and monitored.
+              </p>
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Demo Information */}
+        <Card className="bg-slate-800/30 border-slate-700 mt-6">
+          <CardContent className="p-4">
+            <h4 className="text-white font-medium mb-2">Demo Information</h4>
+            <p className="text-slate-400 text-sm mb-2">
+              For demonstration purposes, use the admin code:{" "}
+              <code className="bg-slate-700 px-2 py-1 rounded text-red-400">APEX_ADMIN_2024</code>
+            </p>
+            <p className="text-slate-500 text-xs">
+              In a production environment, admin codes would be securely managed and rotated regularly.
+            </p>
+          </CardContent>
+        </Card>
+      </div>
+    </div>
+  )
+}

@@ -3,7 +3,7 @@ const app = express();
 const session = require('express-session');
 const passport = require('passport');
 const initializePassport = require('./config/passport-config');
-const port = 3000;
+const port = 8080;
 const db = require('./config/db');
 require('dotenv').config();
 const testRoutes = require('./routes/testRoutes');
