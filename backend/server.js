@@ -8,6 +8,8 @@ const db = require('./config/db');
 require('dotenv').config();
 const testRoutes = require('./routes/testRoutes');
 const authRoutes = require('./routes/authRoutes');
+const messageRoutes = require('./routes/messageRoutes'); // Import message routes
+const { ensureAuthenticated } = require('./middleware/authMiddleware'); // If you plan to use it directly in server.js for some routes
 
 initializePassport(passport);
 
@@ -33,6 +35,7 @@ app.get('/', (req, res) => {
 app.use('/api/test', testRoutes);
 
 app.use('/api/auth', authRoutes);
+app.use('/api/messages',messageRoutes);
 
 app.listen(port, () => {
   console.log(`Server running on http://localhost:${port}`);
