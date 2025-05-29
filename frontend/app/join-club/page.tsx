@@ -2,31 +2,70 @@
 
 import type React from "react"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
-import { Shield, ArrowLeft, Lock, CheckCircle, XCircle } from "lucide-react"
+import { Shield, ArrowLeft, Lock, CheckCircle, XCircle, Loader2 } from "lucide-react"
 import Link from "next/link"
+import { useAuth } from "../../contexts/AuthContext"
+import { useRouter } from "next/navigation"
 
 export default function JoinClubPage() {
+  const { user, isLoading: authLoading, joinClub, error: authError } = useAuth();
+  const router = useRouter();
   const [passcode, setPasscode] = useState("")
-  const [status, setStatus] = useState<"idle" | "success" | "error">("idle")
+  const [status, setStatus] = useState<"idle" | "loading" | "success" | "error">("idle")
   const [message, setMessage] = useState("")
+  const [formError, setFormError] = useState<string | null>(null);
 
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault()
-
-    // Mock passcode validation
-    if (passcode === "APEX2024") {
-      setStatus("success")
-      setMessage("Welcome to the Protocol! Your membership has been activated.")
-      localStorage.setItem("isMember", "true")
-    } else {
-      setStatus("error")
-      setMessage("Invalid access key. Please verify your credentials and try again.")
+  // Redirect to login if not authenticated
+  useEffect(() => {
+    if (!authLoading && !user) {
+      router.push('/login');
     }
+  }, [user, authLoading, router]);
+
+  // Check if user is already a member
+  useEffect(() => {
+    if (user && user.membershipStatus) {
+      setStatus("success");
+      setMessage("You are already a member of the Protocol!");
+    }
+  }, [user]);
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault()
+    setFormError(null);
+    setStatus("loading");
+
+    try {
+      await joinClub(passcode);
+      setStatus("success");
+      setMessage("Welcome to the Protocol! Your membership has been activated.");
+    } catch (err: any) {
+      setStatus("error");
+      setFormError(err.message || "Failed to join club. Please try again.");
+      setMessage("Invalid access key. Please verify your credentials and try again.");
+    }
+  }
+
+  // Show loading state while checking authentication
+  if (authLoading) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-slate-950 via-slate-900 to-slate-950 flex items-center justify-center">
+        <div className="text-center">
+          <Shield className="h-16 w-16 text-blue-400 mx-auto mb-4 animate-pulse" />
+          <p className="text-slate-400">Loading...</p>
+        </div>
+      </div>
+    );
+  }
+
+  // Redirect handled in useEffect above
+  if (!user) {
+    return null;
   }
 
   return (
@@ -75,6 +114,12 @@ export default function JoinClubPage() {
                   </p>
                 </div>
 
+                {(authError || formError) && (
+                  <p className="text-red-400 text-sm text-center">
+                    {formError || authError}
+                  </p>
+                )}
+
                 <Button
                   type="submit"
                   className="w-full bg-purple-600 hover:bg-purple-700 text-white py-3"
@@ -83,6 +128,14 @@ export default function JoinClubPage() {
                   Activate Membership
                 </Button>
               </form>
+            )}
+
+            {status === "loading" && (
+              <div className="text-center space-y-4">
+                <Loader2 className="h-16 w-16 text-purple-400 mx-auto animate-spin" />
+                <h3 className="text-xl font-semibold text-white">Verifying Access Key</h3>
+                <p className="text-slate-300">Please wait while we validate your credentials...</p>
+              </div>
             )}
 
             {status === "success" && (

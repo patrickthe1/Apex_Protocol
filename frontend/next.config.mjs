@@ -9,6 +9,11 @@ const nextConfig = {
   images: {
     unoptimized: true,
   },
+  
+  // Add experimental features to handle SSR better
+  experimental: {
+    optimizePackageImports: ['lucide-react', '@radix-ui/react-icons'],
+  },
 
   reactStrictMode: true, 
   
@@ -21,7 +26,5 @@ const nextConfig = {
     ];
   },
 }
-
-
 
 export default nextConfig

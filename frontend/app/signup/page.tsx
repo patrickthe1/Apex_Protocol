@@ -1,16 +1,20 @@
 "use client"
 
 import type React from "react"
-
 import { useState } from "react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
-import { Shield, ArrowLeft } from "lucide-react"
+import { Shield, ArrowLeft, Loader2 } from "lucide-react"
 import Link from "next/link"
+import { useAuth } from "../../contexts/AuthContext"
+import { useRouter } from 'next/navigation'
 
 export default function SignUpPage() {
+  const { signup, isLoading: authLoading, error: authError } = useAuth();
+  const router = useRouter();
+
   const [formData, setFormData] = useState({
     firstName: "",
     lastName: "",
@@ -18,7 +22,8 @@ export default function SignUpPage() {
     password: "",
     confirmPassword: "",
   })
-  const [errors, setErrors] = useState<Record<string, string>>({})
+  const [errors, setErrors] = useState<Record<string, string>>({});
+  const [formError, setFormError] = useState<string | null>(null);
 
   const validateForm = () => {
     const newErrors: Record<string, string> = {}
@@ -47,17 +52,21 @@ export default function SignUpPage() {
     return Object.keys(newErrors).length === 0
   }
 
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault()
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setFormError(null);
     if (validateForm()) {
-      // Mock success - in real app, this would call an API
-      alert("Account created successfully! Please check your email for verification.")
+      try {
+        await signup(formData.firstName, formData.lastName, formData.email, formData.password);
+        router.push('/login?signupSuccess=true');
+      } catch (err: any) {
+        setFormError(err.message || "Failed to create account. Please try again.");
+      }
     }
-  }
+  };
 
   const handleInputChange = (field: string, value: string) => {
     setFormData((prev) => ({ ...prev, [field]: value }))
-    // Clear error when user starts typing
     if (errors[field]) {
       setErrors((prev) => ({ ...prev, [field]: "" }))
     }
@@ -163,8 +172,12 @@ export default function SignUpPage() {
                 {errors.confirmPassword && <p className="text-red-400 text-sm">{errors.confirmPassword}</p>}
               </div>
 
-              <Button type="submit" className="w-full bg-blue-600 hover:bg-blue-700 text-white py-3">
-                Create Account
+              {formError && <p className="text-red-400 text-sm text-center">{formError}</p>} 
+              {authError && !formError && <p className="text-red-400 text-sm text-center">{authError}</p>}
+
+              <Button type="submit" className="w-full bg-blue-600 hover:bg-blue-700 text-white py-3" disabled={authLoading}>
+                {authLoading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+                {authLoading ? "Creating Account..." : "Create Account"}
               </Button>
             </form>
 

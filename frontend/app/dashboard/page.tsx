@@ -6,25 +6,25 @@ import { Card, CardContent } from "@/components/ui/card"
 import { Shield, Plus, Eye, Trash2, Settings, LogOut } from "lucide-react"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
+import { useAuth } from "../../contexts/AuthContext"
 
 export default function DashboardPage() {
   const router = useRouter()
-  const [isLoggedIn, setIsLoggedIn] = useState(false)
-  const [isMember, setIsMember] = useState(false)
-  const [isAdmin, setIsAdmin] = useState(false)
+  const { user, isLoading, logout } = useAuth();
 
+  // Redirect to login if not authenticated
   useEffect(() => {
-    // Check authentication status from localStorage (mock)
-    setIsLoggedIn(localStorage.getItem("isLoggedIn") === "true")
-    setIsMember(localStorage.getItem("isMember") === "true")
-    setIsAdmin(localStorage.getItem("isAdmin") === "true")
-  }, [])
+    if (!isLoading && !user) {
+      router.push('/login');
+    }
+  }, [user, isLoading, router]);
 
-  const handleLogout = () => {
-    localStorage.removeItem("isLoggedIn")
-    localStorage.removeItem("isMember")
-    localStorage.removeItem("isAdmin")
-    router.push("/")
+  const handleLogout = async () => {
+    try {
+      await logout();
+    } catch (error) {
+      console.error('Logout failed:', error);
+    }
   }
 
   const mockMessages = [
@@ -80,22 +80,26 @@ export default function DashboardPage() {
     },
   ]
 
-  if (!isLoggedIn) {
+  // Show loading state while checking authentication
+  if (isLoading) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-slate-950 via-slate-900 to-slate-950 flex items-center justify-center p-4">
-        <Card className="bg-slate-800/50 border-slate-700 max-w-md w-full">
-          <CardContent className="p-8 text-center">
-            <Shield className="h-16 w-16 text-blue-400 mx-auto mb-4" />
-            <h2 className="text-2xl font-bold text-white mb-4">Access Required</h2>
-            <p className="text-slate-300 mb-6">Please sign in to access the dashboard.</p>
-            <Link href="/login">
-              <Button className="w-full bg-blue-600 hover:bg-blue-700">Sign In</Button>
-            </Link>
-          </CardContent>
-        </Card>
+      <div className="min-h-screen bg-gradient-to-br from-slate-950 via-slate-900 to-slate-950 flex items-center justify-center">
+        <div className="text-center">
+          <Shield className="h-16 w-16 text-blue-400 mx-auto mb-4 animate-pulse" />
+          <p className="text-slate-400">Loading...</p>
+        </div>
       </div>
-    )
+    );
   }
+
+  // Redirect handled in useEffect above
+  if (!user) {
+    return null;
+  }
+
+  const isLoggedIn = !!user;
+  const isMember = user.membershipStatus;
+  const isAdmin = user.isAdmin;
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-950 via-slate-900 to-slate-950">
@@ -152,35 +156,30 @@ export default function DashboardPage() {
           </p>
         </div>
 
-        {/* Status Toggle Controls (for demo purposes) */}
+        {/* User Status Display */}
         <Card className="bg-slate-800/30 border-slate-700 mb-8">
           <CardContent className="p-4">
-            <h3 className="text-white font-medium mb-3">Demo Controls (Toggle Status)</h3>
+            <h3 className="text-white font-medium mb-3">Your Status</h3>
             <div className="flex flex-wrap gap-2">
-              <Button
-                size="sm"
-                variant={isMember ? "default" : "outline"}
-                onClick={() => {
-                  const newStatus = !isMember
-                  setIsMember(newStatus)
-                  localStorage.setItem("isMember", newStatus.toString())
-                }}
-                className={isMember ? "bg-purple-600" : "border-purple-600 text-purple-400"}
-              >
-                {isMember ? "✓ Member" : "Become Member"}
-              </Button>
-              <Button
-                size="sm"
-                variant={isAdmin ? "default" : "outline"}
-                onClick={() => {
-                  const newStatus = !isAdmin
-                  setIsAdmin(newStatus)
-                  localStorage.setItem("isAdmin", newStatus.toString())
-                }}
-                className={isAdmin ? "bg-red-600" : "border-red-600 text-red-400"}
-              >
-                {isAdmin ? "✓ Admin" : "Enable Admin"}
-              </Button>
+              <div className={`px-3 py-1 rounded-full text-sm ${
+                isMember 
+                  ? "bg-purple-600/20 text-purple-400 border border-purple-600/30" 
+                  : "bg-slate-600/20 text-slate-400 border border-slate-600/30"
+              }`}>
+                {isMember ? "✓ Member" : "Guest"}
+              </div>
+              {isAdmin && (
+                <div className="px-3 py-1 bg-red-600/20 text-red-400 border border-red-600/30 rounded-full text-sm">
+                  ✓ Admin
+                </div>
+              )}
+              {!isMember && (
+                <Link href="/join-club">
+                  <Button size="sm" variant="outline" className="border-purple-600 text-purple-400 hover:bg-purple-600/10">
+                    Join Club
+                  </Button>
+                </Link>
+              )}
               <Link href="/admin-access">
                 <Button size="sm" variant="outline" className="border-slate-600 text-slate-400">
                   Admin Access Page

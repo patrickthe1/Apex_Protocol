@@ -6,10 +6,12 @@ const passport = require('passport');
 
 // POST /api/auth/register
 router.post('/register', async (req, res) => {
+  console.log('Registration request body:', req.body); // Debug log
   const { firstName, lastName, email, password, confirmPassword } = req.body;
 
   // --- Basic Validation ---
   if (!firstName || !lastName || !email || !password || !confirmPassword) {
+    console.log('Missing fields:', { firstName: !!firstName, lastName: !!lastName, email: !!email, password: !!password, confirmPassword: !!confirmPassword });
     return res.status(400).json({ msg: 'Please enter all fields' });
   }
 
@@ -128,6 +130,7 @@ router.post('/join-club', async (req, res) => {
 
 // POST /api/auth/login
 router.post('/login', (req, res, next) => {
+  console.log('Login request body:', req.body); // Debug log
   passport.authenticate('local', (err, user, info) => {
     if (err) {
       return next(err); // Handle error (e.g., database error)
