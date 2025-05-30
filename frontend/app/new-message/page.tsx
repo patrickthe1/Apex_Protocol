@@ -11,19 +11,23 @@ import { Textarea } from "@/components/ui/textarea"
 import { Shield, ArrowLeft, Send } from "lucide-react"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
+import { useAuth } from "../../contexts/AuthContext"
 
 export default function NewMessagePage() {
   const router = useRouter()
-  const [isLoggedIn, setIsLoggedIn] = useState(false)
+  const { user, isLoading } = useAuth();
   const [formData, setFormData] = useState({
     title: "",
     content: "",
   })
   const [errors, setErrors] = useState<Record<string, string>>({})
 
+  // Redirect to login if not authenticated
   useEffect(() => {
-    setIsLoggedIn(localStorage.getItem("isLoggedIn") === "true")
-  }, [])
+    if (!isLoading && !user) {
+      router.push('/login');
+    }
+  }, [user, isLoading, router]);
 
   const validateForm = () => {
     const newErrors: Record<string, string> = {}
@@ -58,21 +62,21 @@ export default function NewMessagePage() {
     }
   }
 
-  if (!isLoggedIn) {
+  // Show loading state while checking authentication
+  if (isLoading) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-slate-950 via-slate-900 to-slate-950 flex items-center justify-center p-4">
-        <Card className="bg-slate-800/50 border-slate-700 max-w-md w-full">
-          <CardContent className="p-8 text-center">
-            <Shield className="h-16 w-16 text-blue-400 mx-auto mb-4" />
-            <h2 className="text-2xl font-bold text-white mb-4">Access Required</h2>
-            <p className="text-slate-300 mb-6">Please sign in to create messages.</p>
-            <Link href="/login">
-              <Button className="w-full bg-blue-600 hover:bg-blue-700">Sign In</Button>
-            </Link>
-          </CardContent>
-        </Card>
+      <div className="min-h-screen bg-gradient-to-br from-slate-950 via-slate-900 to-slate-950 flex items-center justify-center">
+        <div className="text-center">
+          <Shield className="h-16 w-16 text-blue-400 mx-auto mb-4 animate-pulse" />
+          <p className="text-slate-400">Loading...</p>
+        </div>
       </div>
-    )
+    );
+  }
+
+  // Redirect handled in useEffect above
+  if (!user) {
+    return null;
   }
 
   return (

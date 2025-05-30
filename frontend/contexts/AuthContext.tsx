@@ -4,13 +4,13 @@ import type React from "react";
 import { createContext, useContext, useState, useEffect, ReactNode } from "react";
 
 interface User {
-  id: string;
+  id: number;
   email: string;
   firstName?: string;
   lastName?: string;
-  membershipStatus:boolean;
+  membershipStatus: boolean;
   isAdmin: boolean;
-  createdAt: string;
+  createdAt?: string; // Made createdAt optional
 }
 
 interface AuthContextType {
@@ -30,23 +30,39 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [user, setUser] = useState<User | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const router = useRouter();
-
-  const checkAuthStatus = async () => {
+  const router = useRouter();  const checkAuthStatus = async () => {
     setIsLoading(true);
     setError(null);
     try {
-      const response = await fetch('/api/auth/status'); // Proxied to backend
+      const response = await fetch('/api/auth/status');
       if (response.ok) {
         const data = await response.json();
-        setUser(data.user);
+        console.log('Auth status response:', data); 
+        if (data.isAuthenticated && data.user) {
+          const backendUser = data.user;
+          const frontendUser: User = {
+            id: backendUser.id,
+            email: backendUser.username || backendUser.email, // Use username, fallback to email
+            firstName: backendUser.first_name,
+            lastName: backendUser.last_name,
+            membershipStatus: backendUser.membership_status,
+            isAdmin: backendUser.is_admin,
+            createdAt: backendUser.created_at,
+          };
+          console.log('Setting mapped user from checkAuthStatus:', frontendUser);
+          setUser(frontendUser);
+        } else {
+          console.log('User not authenticated, setting user to null');
+          setUser(null);
+        }
       } else {
+        console.log('Auth status request failed with status:', response.status);
         setUser(null);
       }
     } catch (err) {
+      console.error("Auth status check failed:", err);
       setUser(null);
       // setError("Failed to check auth status. Please try again later."); // Optional: set an error
-      console.error("Auth status check failed:", err);
     } finally {
       setIsLoading(false);
     }
@@ -59,7 +75,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     setIsLoading(true);
     setError(null);
     try {
-      const response = await fetch('/api/auth/login', { // Proxied to backend
+      const response = await fetch('/api/auth/login', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email, password }),
@@ -68,8 +84,20 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       if (!response.ok) {
         throw new Error(data.msg || data.message || 'Login failed');
       }
-      setUser(data.user);
-      router.push('/dashboard'); // Redirect to dashboard or home
+      // Map backend snake_case to frontend camelCase
+      const backendUser = data.user;
+      const frontendUser: User = {
+        id: backendUser.id,
+        email: backendUser.username || backendUser.email, // Use username, fallback to email
+        firstName: backendUser.first_name,
+        lastName: backendUser.last_name,
+        membershipStatus: backendUser.membership_status,
+        isAdmin: backendUser.is_admin,
+        createdAt: backendUser.created_at,
+      };
+      console.log('Setting mapped user from login:', frontendUser);
+      setUser(frontendUser);
+      router.push('/dashboard');
     } catch (err: any) {
       setError(err.message || 'An unexpected error occurred during login.');
       setUser(null); // Clear user on login failure
@@ -136,13 +164,12 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
           passcode 
         }),
       });
-      const data = await response.json();
-      if (!response.ok) {
+      const data = await response.json();      if (!response.ok) {
         throw new Error(data.msg || data.message || 'Failed to join club');
       }
       
-      // Update user state with new membership status
-      setUser(prev => prev ? { ...prev, membershipStatus: true } : null);
+      // Refresh auth status to get updated user data from backend
+      await checkAuthStatus();
       console.log('Club membership activated:', data);
     } catch (err: any) {
       setError(err.message || 'An unexpected error occurred while joining the club.');

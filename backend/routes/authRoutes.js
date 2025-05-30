@@ -76,6 +76,20 @@ router.post('/register', async (req, res) => {
 
 // POST /api/auth/join-club
 router.post('/join-club', async (req, res) => {
+  console.log('Join club request - isAuthenticated:', req.isAuthenticated());
+  console.log('Join club request - user:', req.user);
+  console.log('Join club request - body:', req.body);
+
+  // Check if user is authenticated
+  if (!req.isAuthenticated()) {
+    return res.status(401).json({ msg: 'Authentication required' });
+  }
+
+  // Ensure req.user exists
+  if (!req.user || !req.user.id) {
+    return res.status(401).json({ msg: 'User session invalid' });
+  }
+
   const { userId, passcode } = req.body;
 
   // --- Basic Validation ---
@@ -83,14 +97,24 @@ router.post('/join-club', async (req, res) => {
     return res.status(400).json({ msg: 'Please provide userId and passcode' });
   }
 
+  // Convert both IDs to numbers for comparison
+  const requestedUserId = parseInt(userId);
+  const sessionUserId = parseInt(req.user.id);
+
+  // Ensure the userId matches the authenticated user
+  if (sessionUserId !== requestedUserId) {
+    return res.status(403).json({ msg: 'Unauthorized: Cannot modify another user\'s membership' });
+  }
+
   // --- Validate Passcode ---
+  console.log('Comparing passcode:', passcode, 'with env:', process.env.MEMBERSHIP_PASSCODE);
   if (passcode !== process.env.MEMBERSHIP_PASSCODE) {
     return res.status(401).json({ msg: 'Invalid passcode. Access denied.' });
   }
 
   try {
     // --- Find user and check current membership status ---
-    const userResult = await db.query('SELECT id, membership_status FROM users WHERE id = $1', [userId]);
+    const userResult = await db.query('SELECT id, membership_status FROM users WHERE id = $1', [requestedUserId]);
 
     if (userResult.rows.length === 0) {
       return res.status(404).json({ msg: 'User not found' });
@@ -105,10 +129,15 @@ router.post('/join-club', async (req, res) => {
     // --- Update membership_status to true ---
     const updateResult = await db.query(
       'UPDATE users SET membership_status = TRUE WHERE id = $1 RETURNING id, username, first_name, last_name, membership_status, is_admin',
-      [userId]
+      [requestedUserId]
     );
 
     const updatedUser = updateResult.rows[0];
+
+    // Update the session with the new user data (safely)
+    if (req.user) {
+      req.user.membership_status = updatedUser.membership_status;
+    }
 
     res.json({
       msg: 'Membership successfully activated!',
@@ -173,15 +202,44 @@ router.get('/logout', (req, res, next) => {
 });
 
 // GET /api/auth/status (Example route to check login status
-router.get('/status', (req, res) => {
+router.get('/status', async (req, res) => {
+  console.log('Auth status check - isAuthenticated:', req.isAuthenticated());
+  console.log('Auth status check - user:', req.user);
+  
   if (req.isAuthenticated()) { // passport adds isAuthenticated() to the request
-    const { password_hash, ...userWithoutPassword } = req.user;
-    res.json({
-      isAuthenticated: true,
-      user: userWithoutPassword
-    });
+    try {      // Fetch fresh user data from database instead of using session data
+      const userResult = await db.query(
+        'SELECT id, username, first_name, last_name, membership_status, is_admin, created_at FROM users WHERE id = $1',
+        [req.user.id]
+      );
+
+      if (userResult.rows.length === 0) {
+        console.log('User not found in database for ID:', req.user.id);
+        return res.status(200).json({ isAuthenticated: false, user: null });
+      }
+
+      const freshUser = userResult.rows[0];
+      console.log('Fresh user data from DB:', freshUser);
+      
+      res.status(200).json({
+        isAuthenticated: true,
+        user: {
+          id: freshUser.id,
+          username: freshUser.username,
+          firstName: freshUser.first_name,
+          lastName: freshUser.last_name,
+          email: freshUser.username, // username is the email in our schema
+          membershipStatus: freshUser.membership_status,
+          isAdmin: freshUser.is_admin,
+          createdAt: freshUser.created_at
+        }
+      });
+    } catch (err) {
+      console.error('Auth status error:', err);
+      res.status(200).json({ isAuthenticated: false, user: null });
+    }
   } else {
-    res.json({ isAuthenticated: false, user: null });
+    res.status(200).json({ isAuthenticated: false, user: null });
   }
 });
 

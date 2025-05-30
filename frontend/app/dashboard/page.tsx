@@ -12,8 +12,12 @@ export default function DashboardPage() {
   const router = useRouter()
   const { user, isLoading, logout } = useAuth();
 
+  // Debug: Log when DashboardPage renders and the state of user
+  console.log('DashboardPage rendered. isLoading:', isLoading, 'User from useAuth():', user);
+
   // Redirect to login if not authenticated
   useEffect(() => {
+    console.log('DashboardPage useEffect [user, isLoading, router] triggered. isLoading:', isLoading, 'User:', user);
     if (!isLoading && !user) {
       router.push('/login');
     }
@@ -94,12 +98,17 @@ export default function DashboardPage() {
 
   // Redirect handled in useEffect above
   if (!user) {
+    console.log('DashboardPage: No user object, returning null (should be redirected by useEffect).');
     return null;
   }
 
   const isLoggedIn = !!user;
-  const isMember = user.membershipStatus;
+  // Correctly access membershipStatus and isAdmin from the user object as per TS type
+  const isMember = user.membershipStatus; 
   const isAdmin = user.isAdmin;
+
+  // Debug: Log user data and membership status
+  console.log('DashboardPage - Calculated isMember:', isMember, 'isAdmin:', isAdmin, 'from user object:', user);
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-950 via-slate-900 to-slate-950">

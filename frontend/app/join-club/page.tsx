@@ -27,13 +27,14 @@ export default function JoinClubPage() {
     }
   }, [user, authLoading, router]);
 
-  // Check if user is already a member
+  // Check if user is already a member (only show after component is mounted and auth is stable)
   useEffect(() => {
-    if (user && user.membershipStatus) {
+    // Wait for auth to complete and give a moment for fresh data
+    if (user && user.membershipStatus && !authLoading) {
       setStatus("success");
       setMessage("You are already a member of the Protocol!");
     }
-  }, [user]);
+  }, [user?.membershipStatus, authLoading]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
