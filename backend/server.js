@@ -17,12 +17,18 @@ initializePassport(passport);
 // CORS Configuration for production deployment
 const corsOptions = {
   origin: process.env.NODE_ENV === 'production' 
-    ? (process.env.FRONTEND_URL ? [process.env.FRONTEND_URL] : ['https://apex-protocol.netlify.app']) // Use environment variable or fallback
+    ? [process.env.FRONTEND_URL || 'https://apex-protocol.netlify.app'] // Use environment variable with fallback
     : ['http://localhost:3000', 'http://127.0.0.1:3000'],
   credentials: true, // Allow cookies/session to be sent
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With']
 };
+
+// Log CORS configuration for debugging
+console.log('CORS Configuration:');
+console.log('Environment:', process.env.NODE_ENV);
+console.log('Allowed origins:', corsOptions.origin);
+console.log('Frontend URL from env:', process.env.FRONTEND_URL);
 
 app.use(cors(corsOptions));
 app.use(express.json());
