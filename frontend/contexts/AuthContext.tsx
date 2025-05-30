@@ -32,6 +32,7 @@ interface AuthContextType {
   checkAuthStatus: () => Promise<void>;
   signup: (firstName: string, lastName: string, email: string, password: string) => Promise<void>;
   joinClub: (passcode: string) => Promise<void>;
+  grantAdminRole: (adminPasscode: string) => Promise<void>;
   createMessage: (title: string, content: string) => Promise<void>;
   deleteMessage: (messageId: number) => Promise<void>;
   refreshMessages: () => Promise<void>;
@@ -162,7 +163,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     } finally {
       setIsLoading(false);
     }  };
-
   const joinClub = async (passcode: string) => {
     setIsLoading(true);
     setError(null);
@@ -188,6 +188,39 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       console.log('Club membership activated:', data);
     } catch (err: any) {
       setError(err.message || 'An unexpected error occurred while joining the club.');
+      throw err; // Re-throw to be caught in the form
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const grantAdminRole = async (adminPasscode: string) => {
+    setIsLoading(true);
+    setError(null);
+    try {
+      if (!user) {
+        throw new Error('You must be logged in to request admin privileges');
+      }
+
+      const response = await fetch('/api/auth/grant-admin', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ 
+          userId: user.id, 
+          adminPasscode 
+        }),
+      });
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.msg || data.message || 'Failed to grant admin privileges');
+      }
+      
+      // Refresh auth status to get updated user data from backend
+      await checkAuthStatus();
+      console.log('Admin privileges granted:', data);
+    } catch (err: any) {
+      setError(err.message || 'An unexpected error occurred while granting admin privileges.');
       throw err; // Re-throw to be caught in the form
     } finally {
       setIsLoading(false);
@@ -274,8 +307,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     } else {
       setMessages([]);
     }
-  }, [user]);
-  return (
+  }, [user]);  return (
     <AuthContext.Provider value={{ 
       user, 
       isLoading, 
@@ -287,6 +319,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       checkAuthStatus, 
       signup, 
       joinClub, 
+      grantAdminRole,
       createMessage, 
       deleteMessage, 
       refreshMessages 

@@ -7,25 +7,39 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
-import { Shield, ArrowLeft, Key, CheckCircle, XCircle } from "lucide-react"
+import { Shield, ArrowLeft, Key, CheckCircle, XCircle, Loader2 } from "lucide-react"
 import Link from "next/link"
+import { useAuth } from "@/contexts/AuthContext"
 
 export default function AdminAccessPage() {
+  const { user, grantAdminRole } = useAuth()
   const [adminCode, setAdminCode] = useState("")
-  const [status, setStatus] = useState<"idle" | "success" | "error">("idle")
+  const [status, setStatus] = useState<"idle" | "loading" | "success" | "error">("idle")
   const [message, setMessage] = useState("")
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
 
-    // Mock admin code validation
-    if (adminCode === "APEX_ADMIN_2024") {
-      setStatus("success")
-      setMessage("Admin privileges activated. You now have full administrative access.")
-      localStorage.setItem("isAdmin", "true")
-    } else {
+    if (!user) {
       setStatus("error")
-      setMessage("Invalid admin code. Access denied.")
+      setMessage("You must be logged in to request admin access.")
+      return
+    }
+
+    setStatus("loading")
+    setMessage("")
+
+    try {
+      await grantAdminRole(adminCode)
+      setStatus("success")
+      setMessage("Admin privileges successfully granted. You now have full administrative access.")
+    } catch (error) {
+      setStatus("error")
+      if (error instanceof Error) {
+        setMessage(error.message)
+      } else {
+        setMessage("Failed to grant admin access. Please check your admin code and try again.")
+      }
     }
   }
 
@@ -85,11 +99,24 @@ export default function AdminAccessPage() {
               </form>
             )}
 
+            {status === "loading" && (
+              <div className="text-center space-y-4">
+                <Loader2 className="h-16 w-16 text-blue-400 mx-auto animate-spin" />
+                <h3 className="text-xl font-semibold text-white">Processing Request</h3>
+                <p className="text-slate-300">Validating admin credentials...</p>
+              </div>
+            )}
+
             {status === "success" && (
               <div className="text-center space-y-4">
                 <CheckCircle className="h-16 w-16 text-green-400 mx-auto" />
                 <h3 className="text-xl font-semibold text-white">Admin Access Granted</h3>
                 <p className="text-slate-300">{message}</p>
+                <div className="bg-green-900/20 border border-green-600/30 rounded-lg p-3">
+                  <p className="text-green-400 text-sm">
+                    ✓ Admin role successfully assigned to your account
+                  </p>
+                </div>
                 <Link href="/dashboard">
                   <Button className="w-full bg-green-600 hover:bg-green-700 text-white">Return to Dashboard</Button>
                 </Link>
@@ -131,7 +158,7 @@ export default function AdminAccessPage() {
             <h4 className="text-white font-medium mb-2">Demo Information</h4>
             <p className="text-slate-400 text-sm mb-2">
               For demonstration purposes, use the admin code:{" "}
-              <code className="bg-slate-700 px-2 py-1 rounded text-red-400">APEX_ADMIN_2024</code>
+              <code className="bg-slate-700 px-2 py-1 rounded text-red-400">APEXADMIN777</code>
             </p>
             <p className="text-slate-500 text-xs">
               In a production environment, admin codes would be securely managed and rotated regularly.
