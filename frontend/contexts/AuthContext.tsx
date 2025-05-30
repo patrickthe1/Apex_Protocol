@@ -2,6 +2,7 @@
 import { useRouter } from "next/navigation";
 import type React from "react";
 import { createContext, useContext, useState, useEffect, ReactNode } from "react";
+import { apiRequest } from "@/lib/api";
 
 interface User {
   id: number;
@@ -46,11 +47,11 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [error, setError] = useState<string | null>(null);
   const [messages, setMessages] = useState<Message[]>([]);
   const [isLoadingMessages, setIsLoadingMessages] = useState(false);
-  const router = useRouter();const checkAuthStatus = async () => {
+  const router = useRouter();  const checkAuthStatus = async () => {
     setIsLoading(true);
     setError(null);
     try {
-      const response = await fetch('/api/auth/status');
+      const response = await apiRequest('/api/auth/status');
       if (response.ok) {
         const data = await response.json();
         console.log('Auth status response:', data); 
@@ -86,14 +87,12 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
   useEffect(() => {
     checkAuthStatus();
-  }, []);
-  const login = async (email: string, password: string) => {
+  }, []);  const login = async (email: string, password: string) => {
     setIsLoading(true);
     setError(null);
     try {
-      const response = await fetch('/api/auth/login', {
+      const response = await apiRequest('/api/auth/login', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email, password }),
       });
       const data = await response.json();
@@ -124,9 +123,9 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
   const logout = async () => {
     setIsLoading(true);
-    setError(null);
+        setError(null);
     try {
-      await fetch('/api/auth/logout', { method: 'GET' }); // Proxied
+      await apiRequest('/api/auth/logout', { method: 'GET' });
       setUser(null);
       router.push('/login'); // Redirect to login page
     } catch (err: any) {
@@ -139,9 +138,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     setIsLoading(true);
     setError(null);
     try {
-      const response = await fetch('/api/auth/register', { // Proxied to backend
+            const response = await apiRequest('/api/auth/register', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ 
           firstName, 
           lastName, 
@@ -169,11 +167,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     try {
       if (!user) {
         throw new Error('You must be logged in to join the club');
-      }
-
-      const response = await fetch('/api/auth/join-club', {
+      }      const response = await apiRequest('/api/auth/join-club', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ 
           userId: user.id, 
           passcode 
@@ -200,11 +195,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     try {
       if (!user) {
         throw new Error('You must be logged in to request admin privileges');
-      }
-
-      const response = await fetch('/api/auth/grant-admin', {
+      }      const response = await apiRequest('/api/auth/grant-admin', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ 
           userId: user.id, 
           adminPasscode 
@@ -241,10 +233,10 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   };
 
   // Message-related functions
-  const refreshMessages = async () => {
+    const refreshMessages = async () => {
     setIsLoadingMessages(true);
     try {
-      const response = await fetch('/api/messages');
+      const response = await apiRequest('/api/messages');
       if (response.ok) {
         const data = await response.json();
         setMessages(data);
@@ -262,11 +254,9 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
   const createMessage = async (title: string, content: string) => {
     setIsLoading(true);
-    setError(null);
-    try {
-      const response = await fetch('/api/messages', {
+    setError(null);    try {
+      const response = await apiRequest('/api/messages', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ 
           title, 
           textContent: content 
@@ -291,9 +281,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
   const deleteMessage = async (messageId: number) => {
     setIsLoading(true);
-    setError(null);
-    try {
-      const response = await fetch(`/api/messages/${messageId}`, {
+    setError(null);    try {
+      const response = await apiRequest(`/api/messages/${messageId}`, {
         method: 'DELETE',
       });
       const data = await response.json();

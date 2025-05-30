@@ -1,7 +1,7 @@
 "use client"
 
 import type React from "react"
-import { useState, useEffect } from "react"
+import { useState, useEffect, Suspense } from "react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
@@ -11,7 +11,8 @@ import Link from "next/link"
 import { useAuth } from "../../contexts/AuthContext"
 import { useRouter, useSearchParams } from 'next/navigation'
 
-export default function LoginPage() {
+// Component that uses useSearchParams wrapped in Suspense
+function LoginPageContent() {
   const { login, isLoading: authLoading, error: authError, user, logout } = useAuth();
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -176,5 +177,18 @@ export default function LoginPage() {
         </Card>
       </div>
     </div>
+  );
+}
+
+// Main component with Suspense boundary
+export default function LoginPage() {
+  return (
+    <Suspense fallback={
+      <div className="min-h-screen bg-gradient-to-br from-slate-900 via-blue-900 to-slate-800 flex items-center justify-center">
+        <div className="text-white">Loading...</div>
+      </div>
+    }>
+      <LoginPageContent />
+    </Suspense>
   );
 }
