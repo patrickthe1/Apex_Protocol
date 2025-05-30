@@ -41,14 +41,42 @@ async function seedDatabase() {
     if (createdUsers.length < 3) {
         console.error("Not enough users created to seed messages properly.");
         return;
-    }
-
-    const messagesToCreate = [
-      { title: 'Hello World', textContent: 'My first post!', userId: createdUsers[0].id }, // Alice (non-member)
-      { title: 'Club Rules', textContent: 'Welcome to the club, members!', userId: createdUsers[1].id }, // Bob (member)
-      { title: 'Admin Announcement', textContent: 'Important update from admin.', userId: createdUsers[2].id }, // Charlie (admin & member)
-      { title: 'Thoughts on Privacy', textContent: 'A public thought.', userId: createdUsers[0].id }, // Alice (non-member)
-      { title: 'Project Ideas', textContent: 'Let\'s discuss new projects.', userId: createdUsers[1].id } // Bob (member)
+    }    const messagesToCreate = [
+      { 
+        title: 'The Future of Decentralized Finance', 
+        textContent: 'Recent developments in DeFi protocols suggest a paradigm shift that most aren\'t seeing yet. The convergence of institutional adoption and regulatory clarity is creating unprecedented opportunities for strategic positioning. Three key indicators point to a transformation that will reshape traditional finance within the next 18 months.', 
+        userId: createdUsers[0].id 
+      }, // Alice (non-member)
+      { 
+        title: 'Strategic Market Positioning in Q4', 
+        textContent: 'Three key indicators point to an unprecedented opportunity in emerging markets. The correlation between geopolitical stability and tech infrastructure investment is reaching an inflection point. Smart money is quietly positioning in sectors that institutional investors haven\'t discovered yet. The data suggests we\'re at the beginning of a major cycle shift.', 
+        userId: createdUsers[1].id 
+      }, // Bob (member)
+      { 
+        title: 'AI Infrastructure Investment Thesis', 
+        textContent: 'The next wave of AI infrastructure will be built on principles that current players are ignoring. Edge computing combined with specialized hardware creates a moat that\'s still available to capture. Most investors are focusing on the obvious plays while the real value is being created in the infrastructure layer. This is a 10-year opportunity window.', 
+        userId: createdUsers[2].id 
+      }, // Charlie (admin & member)
+      { 
+        title: 'Regulatory Arbitrage Opportunities', 
+        textContent: 'Cross-jurisdictional analysis reveals significant gaps that sophisticated players can leverage. The window is closing, but there\'s still time for strategic positioning. New frameworks emerging in key markets are creating temporary advantages for those who understand the regulatory landscape. The compliance overhead is actually becoming a competitive moat.', 
+        userId: createdUsers[1].id 
+      }, // Bob (member)
+      { 
+        title: 'Supply Chain Disruption Patterns', 
+        textContent: 'Analyzing 15 years of supply chain data reveals predictable patterns that most companies miss. The next disruption is already visible if you know where to look. Historical precedents suggest we\'re entering a period where agility trumps efficiency. Companies that adapt their supply chain strategy now will have significant advantages over the next decade.', 
+        userId: createdUsers[3].id 
+      }, // Diana (non-member)
+      { 
+        title: 'Energy Transition Investment Framework', 
+        textContent: 'The energy transition is creating asymmetric opportunities that traditional energy investors are missing. Battery technology advances are outpacing adoption curves, creating value gaps in specific segments. Policy alignment across major economies is creating a tailwind that won\'t last forever. The next 24 months are critical for positioning.', 
+        userId: createdUsers[2].id 
+      }, // Charlie (admin & member)
+      { 
+        title: 'Real Estate Technology Convergence', 
+        textContent: 'PropTech is finally reaching maturity, but the real opportunities are in the convergence layers. IoT, AI, and blockchain are creating new property categories that traditional real estate hasn\'t recognized yet. Demographics and technology trends are aligning to create a perfect storm for early adopters.', 
+        userId: createdUsers[0].id 
+      } // Alice (non-member)
     ];
 
     for (const msgData of messagesToCreate) {

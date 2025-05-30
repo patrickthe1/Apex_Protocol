@@ -1,7 +1,6 @@
 "use client"
 
-import type React from "react"
-
+import React from "react"
 import { useState, useEffect } from "react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
@@ -15,12 +14,13 @@ import { useAuth } from "../../contexts/AuthContext"
 
 export default function NewMessagePage() {
   const router = useRouter()
-  const { user, isLoading } = useAuth();
+  const { user, isLoading, createMessage } = useAuth();
   const [formData, setFormData] = useState({
     title: "",
     content: "",
   })
   const [errors, setErrors] = useState<Record<string, string>>({})
+  const [isSubmitting, setIsSubmitting] = useState(false)
 
   // Redirect to login if not authenticated
   useEffect(() => {
@@ -45,12 +45,22 @@ export default function NewMessagePage() {
     return Object.keys(newErrors).length === 0
   }
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    if (validateForm()) {
-      // Mock message creation - in real app, this would call an API
-      alert("Message published successfully!")
-      router.push("/dashboard")
+    if (!validateForm()) return;
+
+    setIsSubmitting(true);
+    try {
+      await createMessage(formData.title.trim(), formData.content.trim());
+      
+      // Success feedback and redirect
+      router.push("/dashboard");
+    } catch (error: any) {
+      // Error is already handled in AuthContext, but we can show additional feedback here
+      console.error('Failed to create message:', error);
+      // The error state is already set in AuthContext
+    } finally {
+      setIsSubmitting(false);
     }
   }
 
@@ -164,10 +174,10 @@ export default function NewMessagePage() {
                 <Button
                   type="submit"
                   className="bg-blue-600 hover:bg-blue-700 text-white"
-                  disabled={!formData.title.trim() || !formData.content.trim()}
+                  disabled={!formData.title.trim() || !formData.content.trim() || isSubmitting}
                 >
                   <Send className="h-4 w-4 mr-2" />
-                  Publish Message
+                  {isSubmitting ? "Publishing..." : "Publish Message"}
                 </Button>
               </div>
             </form>

@@ -13,15 +13,28 @@ interface User {
   createdAt?: string; // Made createdAt optional
 }
 
+interface Message {
+  id: number;
+  title: string;
+  textContent: string;
+  timestamp: string;
+  authorFullName?: string; // Only visible to members
+}
+
 interface AuthContextType {
   user: User | null;
   isLoading: boolean;
   error: string | null;
+  messages: Message[];
+  isLoadingMessages: boolean;
   login: (email: string, password: string) => Promise<void>;
   logout: () => Promise<void>;
   checkAuthStatus: () => Promise<void>;
   signup: (firstName: string, lastName: string, email: string, password: string) => Promise<void>;
   joinClub: (passcode: string) => Promise<void>;
+  createMessage: (title: string, content: string) => Promise<void>;
+  deleteMessage: (messageId: number) => Promise<void>;
+  refreshMessages: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -30,7 +43,9 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [user, setUser] = useState<User | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const router = useRouter();  const checkAuthStatus = async () => {
+  const [messages, setMessages] = useState<Message[]>([]);
+  const [isLoadingMessages, setIsLoadingMessages] = useState(false);
+  const router = useRouter();const checkAuthStatus = async () => {
     setIsLoading(true);
     setError(null);
     try {
@@ -179,8 +194,103 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     }
   };
 
+  // Message-related functions
+  const refreshMessages = async () => {
+    setIsLoadingMessages(true);
+    try {
+      const response = await fetch('/api/messages');
+      if (response.ok) {
+        const data = await response.json();
+        setMessages(data);
+      } else {
+        console.error('Failed to fetch messages:', response.status);
+        setMessages([]);
+      }
+    } catch (err) {
+      console.error('Error fetching messages:', err);
+      setMessages([]);
+    } finally {
+      setIsLoadingMessages(false);
+    }
+  };
+
+  const createMessage = async (title: string, content: string) => {
+    setIsLoading(true);
+    setError(null);
+    try {
+      const response = await fetch('/api/messages', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ 
+          title, 
+          textContent: content 
+        }),
+      });
+      const data = await response.json();
+      
+      if (!response.ok) {
+        throw new Error(data.msg || data.message || 'Failed to create message');
+      }
+      
+      // Refresh messages after successful creation
+      await refreshMessages();
+      console.log('Message created successfully:', data);
+    } catch (err: any) {
+      setError(err.message || 'An unexpected error occurred while creating the message.');
+      throw err; // Re-throw to be caught in the form
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const deleteMessage = async (messageId: number) => {
+    setIsLoading(true);
+    setError(null);
+    try {
+      const response = await fetch(`/api/messages/${messageId}`, {
+        method: 'DELETE',
+      });
+      const data = await response.json();
+      
+      if (!response.ok) {
+        throw new Error(data.msg || data.message || 'Failed to delete message');
+      }
+      
+      // Refresh messages after successful deletion
+      await refreshMessages();
+      console.log('Message deleted successfully:', data);
+    } catch (err: any) {
+      setError(err.message || 'An unexpected error occurred while deleting the message.');
+      throw err; // Re-throw to be caught in the component
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  // Load messages when user authentication status changes
+  useEffect(() => {
+    if (user) {
+      refreshMessages();
+    } else {
+      setMessages([]);
+    }
+  }, [user]);
   return (
-    <AuthContext.Provider value={{ user, isLoading, error, login, logout, checkAuthStatus, signup, joinClub }}>
+    <AuthContext.Provider value={{ 
+      user, 
+      isLoading, 
+      error, 
+      messages, 
+      isLoadingMessages, 
+      login, 
+      logout, 
+      checkAuthStatus, 
+      signup, 
+      joinClub, 
+      createMessage, 
+      deleteMessage, 
+      refreshMessages 
+    }}>
       {children}
     </AuthContext.Provider>
   );
