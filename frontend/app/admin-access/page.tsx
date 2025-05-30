@@ -3,6 +3,7 @@
 import type React from "react"
 
 import { useState } from "react"
+import { useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
@@ -13,6 +14,7 @@ import { useAuth } from "@/contexts/AuthContext"
 
 export default function AdminAccessPage() {
   const { user, grantAdminRole } = useAuth()
+  const router = useRouter()
   const [adminCode, setAdminCode] = useState("")
   const [status, setStatus] = useState<"idle" | "loading" | "success" | "error">("idle")
   const [message, setMessage] = useState("")
@@ -117,9 +119,15 @@ export default function AdminAccessPage() {
                     ✓ Admin role successfully assigned to your account
                   </p>
                 </div>
-                <Link href="/dashboard">
-                  <Button className="w-full bg-green-600 hover:bg-green-700 text-white">Return to Dashboard</Button>
-                </Link>
+                <Button 
+                  onClick={() => {
+                    // Force a complete page refresh to ensure updated auth state
+                    window.location.href = "/dashboard";
+                  }}
+                  className="w-full bg-green-600 hover:bg-green-700 text-white"
+                >
+                  Return to Dashboard
+                </Button>
               </div>
             )}
 
@@ -149,20 +157,6 @@ export default function AdminAccessPage() {
                 system configuration. Unauthorized access attempts are logged and monitored.
               </p>
             </div>
-          </CardContent>
-        </Card>
-
-        {/* Demo Information */}
-        <Card className="bg-slate-800/30 border-slate-700 mt-6">
-          <CardContent className="p-4">
-            <h4 className="text-white font-medium mb-2">Demo Information</h4>
-            <p className="text-slate-400 text-sm mb-2">
-              For demonstration purposes, use the admin code:{" "}
-              <code className="bg-slate-700 px-2 py-1 rounded text-red-400">APEXADMIN777</code>
-            </p>
-            <p className="text-slate-500 text-xs">
-              In a production environment, admin codes would be securely managed and rotated regularly.
-            </p>
           </CardContent>
         </Card>
       </div>

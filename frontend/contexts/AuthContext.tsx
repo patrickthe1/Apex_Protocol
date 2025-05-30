@@ -55,15 +55,15 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         const data = await response.json();
         console.log('Auth status response:', data); 
         if (data.isAuthenticated && data.user) {
-          const backendUser = data.user;
+          const backendUser = data.user; // data.user from /api/auth/status has camelCase keys
           const frontendUser: User = {
             id: backendUser.id,
-            email: backendUser.username || backendUser.email, // Use username, fallback to email
-            firstName: backendUser.first_name,
-            lastName: backendUser.last_name,
-            membershipStatus: backendUser.membership_status,
-            isAdmin: backendUser.is_admin,
-            createdAt: backendUser.created_at,
+            email: backendUser.username || backendUser.email, // username and email are usually the same or username is the email
+            firstName: backendUser.firstName, // Corrected: expect camelCase firstName
+            lastName: backendUser.lastName,   // Corrected: expect camelCase lastName
+            membershipStatus: !!backendUser.membershipStatus, // Corrected: expect camelCase membershipStatus & ensure boolean
+            isAdmin: !!backendUser.isAdmin, // Corrected: expect camelCase isAdmin & ensure boolean
+            createdAt: backendUser.createdAt, // Corrected: expect camelCase createdAt
           };
           console.log('Setting mapped user from checkAuthStatus:', frontendUser);
           setUser(frontendUser);
@@ -210,13 +210,26 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
           adminPasscode 
         }),
       });
-      const data = await response.json();
-
-      if (!response.ok) {
+      const data = await response.json();      if (!response.ok) {
         throw new Error(data.msg || data.message || 'Failed to grant admin privileges');
+      }      // Directly update user state with the returned user data
+      if (data.user) {
+        const backendUser = data.user;
+        const updatedUser: User = {
+          id: backendUser.id,
+          email: backendUser.username || user.email,
+          firstName: backendUser.firstName || user.firstName,
+          lastName: backendUser.lastName || user.lastName,
+          membershipStatus: backendUser.membershipStatus,
+          isAdmin: backendUser.isAdmin,
+          createdAt: user.createdAt,
+        };
+        console.log('Backend user data received:', backendUser);
+        console.log('Updating user state directly with admin role:', updatedUser);
+        setUser(updatedUser);
       }
       
-      // Refresh auth status to get updated user data from backend
+      // Also refresh auth status to ensure consistency
       await checkAuthStatus();
       console.log('Admin privileges granted:', data);
     } catch (err: any) {

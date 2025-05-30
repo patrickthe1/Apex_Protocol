@@ -144,9 +144,15 @@ export default function JoinClubPage() {
                 <CheckCircle className="h-16 w-16 text-green-400 mx-auto" />
                 <h3 className="text-xl font-semibold text-white">Access Granted</h3>
                 <p className="text-slate-300">{message}</p>
-                <Link href="/dashboard">
-                  <Button className="w-full bg-green-600 hover:bg-green-700 text-white">Enter Dashboard</Button>
-                </Link>
+                <Button 
+                  onClick={() => {
+                    // Force a complete page refresh to ensure updated auth state
+                    window.location.href = "/dashboard";
+                  }}
+                  className="w-full bg-green-600 hover:bg-green-700 text-white"
+                >
+                  Enter Dashboard
+                </Button>
               </div>
             )}
 

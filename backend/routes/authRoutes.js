@@ -275,9 +275,12 @@ router.post('/grant-admin', async (req, res) => {
     const updateResult = await db.query(
       'UPDATE users SET is_admin = TRUE WHERE id = $1 RETURNING id, username, first_name, last_name, membership_status, is_admin',
       [userId]
-    );
+    );    const updatedUser = updateResult.rows[0];
 
-    const updatedUser = updateResult.rows[0];
+    // Update the session with the new user data (safely)
+    if (req.user) {
+      req.user.is_admin = updatedUser.is_admin;
+    }
 
     res.json({
       msg: 'Admin privileges granted successfully!',
