@@ -2,7 +2,7 @@
 import { useRouter } from "next/navigation";
 import type React from "react";
 import { createContext, useContext, useState, useEffect, ReactNode } from "react";
-import { apiRequest } from "@/lib/api";
+import { apiRequest, getAuthToken, setAuthToken, removeAuthToken } from "@/lib/api";
 
 interface User {
   id: number;
@@ -50,36 +50,50 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const router = useRouter();  const checkAuthStatus = async () => {
     setIsLoading(true);
     setError(null);
+    
+    // Check if token exists
+    const token = getAuthToken();
+    if (!token) {
+      console.log('No token found, user not authenticated');
+      setUser(null);
+      setIsLoading(false);
+      return;
+    }
+
     try {
       const response = await apiRequest('/api/auth/status');
       if (response.ok) {
         const data = await response.json();
         console.log('Auth status response:', data); 
         if (data.isAuthenticated && data.user) {
-          const backendUser = data.user; // data.user from /api/auth/status has camelCase keys
+          const backendUser = data.user;
           const frontendUser: User = {
             id: backendUser.id,
-            email: backendUser.username || backendUser.email, // username and email are usually the same or username is the email
-            firstName: backendUser.firstName, // Corrected: expect camelCase firstName
-            lastName: backendUser.lastName,   // Corrected: expect camelCase lastName
-            membershipStatus: !!backendUser.membershipStatus, // Corrected: expect camelCase membershipStatus & ensure boolean
-            isAdmin: !!backendUser.isAdmin, // Corrected: expect camelCase isAdmin & ensure boolean
-            createdAt: backendUser.createdAt, // Corrected: expect camelCase createdAt
+            email: backendUser.email,
+            firstName: backendUser.firstName,
+            lastName: backendUser.lastName,
+            membershipStatus: !!backendUser.membershipStatus,
+            isAdmin: !!backendUser.isAdmin,
+            createdAt: backendUser.createdAt,
           };
           console.log('Setting mapped user from checkAuthStatus:', frontendUser);
           setUser(frontendUser);
         } else {
-          console.log('User not authenticated, setting user to null');
+          console.log('User not authenticated, removing token');
+          removeAuthToken();
           setUser(null);
         }
       } else {
         console.log('Auth status request failed with status:', response.status);
+        if (response.status === 401) {
+          // Token is invalid, remove it
+          removeAuthToken();
+        }
         setUser(null);
       }
     } catch (err) {
       console.error("Auth status check failed:", err);
       setUser(null);
-      // setError("Failed to check auth status. Please try again later."); // Optional: set an error
     } finally {
       setIsLoading(false);
     }
@@ -99,134 +113,186 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       if (!response.ok) {
         throw new Error(data.msg || data.message || 'Login failed');
       }
-      // Map backend snake_case to frontend camelCase
+
+      // Store JWT token
+      if (data.token) {
+        setAuthToken(data.token);
+      }
+
+      // Map backend response to frontend User interface
       const backendUser = data.user;
       const frontendUser: User = {
         id: backendUser.id,
-        email: backendUser.username || backendUser.email, // Use username, fallback to email
-        firstName: backendUser.first_name,
-        lastName: backendUser.last_name,
-        membershipStatus: backendUser.membership_status,
-        isAdmin: backendUser.is_admin,
-        createdAt: backendUser.created_at,
+        email: backendUser.email,
+        firstName: backendUser.firstName,
+        lastName: backendUser.lastName,
+        membershipStatus: backendUser.membershipStatus,
+        isAdmin: backendUser.isAdmin,
+        createdAt: backendUser.createdAt,
       };
       console.log('Setting mapped user from login:', frontendUser);
       setUser(frontendUser);
       router.push('/dashboard');
     } catch (err: any) {
       setError(err.message || 'An unexpected error occurred during login.');
-      setUser(null); // Clear user on login failure
+      setUser(null);
     } finally {
       setIsLoading(false);
     }
   };
-
   const logout = async () => {
     setIsLoading(true);
-        setError(null);
+    setError(null);
     try {
-      await apiRequest('/api/auth/logout', { method: 'GET' });
+      // Remove token from localStorage
+      removeAuthToken();
+      
+      // Optional: notify backend about logout (for token blacklisting if implemented)
+      await apiRequest('/api/auth/logout', { method: 'POST' });
+      
       setUser(null);
-      router.push('/login'); // Redirect to login page
+      router.push('/login');
     } catch (err: any) {
       setError(err.message || 'Logout failed. Please try again.');
     } finally {
       setIsLoading(false);
     }
-  };
-  const signup = async (firstName: string, lastName: string, email: string, password: string) => {
+  };  const signup = async (firstName: string, lastName: string, email: string, password: string) => {
     setIsLoading(true);
     setError(null);
     try {
-            const response = await apiRequest('/api/auth/register', {
+      const response = await apiRequest('/api/auth/register', {
         method: 'POST',
         body: JSON.stringify({ 
           firstName, 
           lastName, 
           email, 
           password,
-          confirmPassword: password // Include confirmPassword with same value
+          confirmPassword: password
         }),
       });
       const data = await response.json();
       if (!response.ok) {
         throw new Error(data.msg || data.message || 'Signup failed');
       }
-      // Signup successful, but user is not logged in yet.
-      // The form will redirect to login.
+
+      // Store JWT token if provided (auto-login after signup)
+      if (data.token) {
+        setAuthToken(data.token);
+        
+        // Map backend response to frontend User interface
+        const backendUser = data.user;
+        const frontendUser: User = {
+          id: backendUser.id,
+          email: backendUser.email,
+          firstName: backendUser.firstName,
+          lastName: backendUser.lastName,
+          membershipStatus: backendUser.membershipStatus,
+          isAdmin: backendUser.isAdmin,
+          createdAt: backendUser.createdAt,
+        };
+        setUser(frontendUser);
+      }
+
       console.log('Signup successful:', data);
     } catch (err: any) {
       setError(err.message || 'An unexpected error occurred during signup.');
-      throw err; // Re-throw to be caught in the form
+      throw err;
     } finally {
       setIsLoading(false);
-    }  };
-  const joinClub = async (passcode: string) => {
+    }
+  };  const joinClub = async (passcode: string) => {
     setIsLoading(true);
     setError(null);
     try {
       if (!user) {
         throw new Error('You must be logged in to join the club');
-      }      const response = await apiRequest('/api/auth/join-club', {
+      }
+
+      const response = await apiRequest('/api/auth/join-club', {
         method: 'POST',
-        body: JSON.stringify({ 
-          userId: user.id, 
-          passcode 
-        }),
+        body: JSON.stringify({ membershipPasscode: passcode }),
       });
-      const data = await response.json();      if (!response.ok) {
+      const data = await response.json();
+
+      if (!response.ok) {
         throw new Error(data.msg || data.message || 'Failed to join club');
       }
-      
-      // Refresh auth status to get updated user data from backend
-      await checkAuthStatus();
+
+      // Update token if provided
+      if (data.token) {
+        setAuthToken(data.token);
+      }
+
+      // Update user state with new membership status
+      if (data.user) {
+        const backendUser = data.user;
+        const updatedUser: User = {
+          id: backendUser.id,
+          email: backendUser.email,
+          firstName: backendUser.firstName,
+          lastName: backendUser.lastName,
+          membershipStatus: backendUser.membershipStatus,
+          isAdmin: backendUser.isAdmin,
+          createdAt: backendUser.createdAt,
+        };
+        setUser(updatedUser);
+      }
+
       console.log('Club membership activated:', data);
     } catch (err: any) {
       setError(err.message || 'An unexpected error occurred while joining the club.');
-      throw err; // Re-throw to be caught in the form
+      throw err;
     } finally {
       setIsLoading(false);
     }
   };
-
   const grantAdminRole = async (adminPasscode: string) => {
     setIsLoading(true);
     setError(null);
     try {
       if (!user) {
         throw new Error('You must be logged in to request admin privileges');
-      }      const response = await apiRequest('/api/auth/grant-admin', {
+      }
+
+      const response = await apiRequest('/api/auth/grant-admin', {
         method: 'POST',
         body: JSON.stringify({ 
           userId: user.id, 
           adminPasscode 
         }),
       });
-      const data = await response.json();      if (!response.ok) {
+      const data = await response.json();
+
+      if (!response.ok) {
         throw new Error(data.msg || data.message || 'Failed to grant admin privileges');
-      }      // Directly update user state with the returned user data
+      }
+
+      // Update token if provided
+      if (data.token) {
+        setAuthToken(data.token);
+      }
+
+      // Update user state with admin privileges
       if (data.user) {
         const backendUser = data.user;
         const updatedUser: User = {
           id: backendUser.id,
-          email: backendUser.username || user.email,
-          firstName: backendUser.firstName || user.firstName,
-          lastName: backendUser.lastName || user.lastName,
+          email: backendUser.email,
+          firstName: backendUser.firstName,
+          lastName: backendUser.lastName,
           membershipStatus: backendUser.membershipStatus,
           isAdmin: backendUser.isAdmin,
-          createdAt: user.createdAt,
+          createdAt: backendUser.createdAt,
         };
-        console.log('Backend user data received:', backendUser);
-        console.log('Updating user state directly with admin role:', updatedUser);
+        console.log('Updating user state with admin role:', updatedUser);
         setUser(updatedUser);
       }
       
-      // Also refresh auth status to ensure consistency
-      await checkAuthStatus();
       console.log('Admin privileges granted:', data);
     } catch (err: any) {
       setError(err.message || 'An unexpected error occurred while granting admin privileges.');
-      throw err; // Re-throw to be caught in the form
+      throw err;
     } finally {
       setIsLoading(false);
     }

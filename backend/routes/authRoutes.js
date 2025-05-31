@@ -2,7 +2,7 @@ const express = require('express');
 const router = express.Router();
 const bcrypt = require('bcryptjs');
 const db = require('../config/db');
-const passport = require('passport');
+const { generateToken, authenticateToken, optionalAuth } = require('../utils/jwt');
 
 // POST /api/auth/register
 router.post('/register', async (req, res) => {
@@ -35,13 +35,10 @@ router.post('/register', async (req, res) => {
 
     if (userExists.rows.length > 0) {
       return res.status(400).json({ msg: 'User with this email already exists' });
-    }
-
-    // --- Hash password ---
+    }    // --- Hash password ---
     const salt = await bcrypt.genSalt(10); // Generate a salt
     const passwordHash = await bcrypt.hash(password, salt); // Hash the password
 
-   
     const newUserQuery = `
       INSERT INTO users (first_name, last_name, username, password_hash, membership_status, is_admin)
       VALUES ($1, $2, $3, $4, FALSE, FALSE)
@@ -52,14 +49,19 @@ router.post('/register', async (req, res) => {
     const { rows } = await db.query(newUserQuery, [firstName, lastName, email, passwordHash]);
     const newUser = rows[0];
 
-    // Respond with the created user (excluding password_hash)
+    // Generate JWT token for the new user
+    const token = generateToken(newUser);
+
+    // Respond with the created user and token
     res.status(201).json({
       msg: 'User registered successfully',
+      token,
       user: {
         id: newUser.id,
         username: newUser.username,
         firstName: newUser.first_name,
         lastName: newUser.last_name,
+        email: newUser.username,
         membershipStatus: newUser.membership_status,
         isAdmin: newUser.is_admin,
         createdAt: newUser.created_at
@@ -72,49 +74,33 @@ router.post('/register', async (req, res) => {
   }
 });
 
-// ... existing code (imports, /register route) ...
-
 // POST /api/auth/join-club
-router.post('/join-club', async (req, res) => {
-  console.log('Join club request - isAuthenticated:', req.isAuthenticated());
+router.post('/join-club', authenticateToken, async (req, res) => {
   console.log('Join club request - user:', req.user);
   console.log('Join club request - body:', req.body);
 
-  // Check if user is authenticated
-  if (!req.isAuthenticated()) {
-    return res.status(401).json({ msg: 'Authentication required' });
-  }
-
-  // Ensure req.user exists
-  if (!req.user || !req.user.id) {
-    return res.status(401).json({ msg: 'User session invalid' });
-  }
-
-  const { userId, passcode } = req.body;
+  const { userId, passcode, membershipPasscode } = req.body;
+  const actualPasscode = passcode || membershipPasscode; // Support both field names
 
   // --- Basic Validation ---
-  if (!userId || !passcode) {
-    return res.status(400).json({ msg: 'Please provide userId and passcode' });
+  if (!actualPasscode) {
+    return res.status(400).json({ msg: 'Please provide membership passcode' });
   }
 
-  // Convert both IDs to numbers for comparison
-  const requestedUserId = parseInt(userId);
-  const sessionUserId = parseInt(req.user.id);
-
-  // Ensure the userId matches the authenticated user
-  if (sessionUserId !== requestedUserId) {
+  // If userId is provided, ensure it matches the authenticated user
+  if (userId && parseInt(userId) !== req.user.id) {
     return res.status(403).json({ msg: 'Unauthorized: Cannot modify another user\'s membership' });
   }
 
   // --- Validate Passcode ---
-  console.log('Comparing passcode:', passcode, 'with env:', process.env.MEMBERSHIP_PASSCODE);
-  if (passcode !== process.env.MEMBERSHIP_PASSCODE) {
+  console.log('Comparing passcode:', actualPasscode, 'with env:', process.env.MEMBERSHIP_PASSCODE);
+  if (actualPasscode !== process.env.MEMBERSHIP_PASSCODE) {
     return res.status(401).json({ msg: 'Invalid passcode. Access denied.' });
   }
 
   try {
     // --- Find user and check current membership status ---
-    const userResult = await db.query('SELECT id, membership_status FROM users WHERE id = $1', [requestedUserId]);
+    const userResult = await db.query('SELECT id, membership_status FROM users WHERE id = $1', [req.user.id]);
 
     if (userResult.rows.length === 0) {
       return res.status(404).json({ msg: 'User not found' });
@@ -129,23 +115,23 @@ router.post('/join-club', async (req, res) => {
     // --- Update membership_status to true ---
     const updateResult = await db.query(
       'UPDATE users SET membership_status = TRUE WHERE id = $1 RETURNING id, username, first_name, last_name, membership_status, is_admin',
-      [requestedUserId]
+      [req.user.id]
     );
 
     const updatedUser = updateResult.rows[0];
 
-    // Update the session with the new user data (safely)
-    if (req.user) {
-      req.user.membership_status = updatedUser.membership_status;
-    }
+    // Generate new token with updated membership status
+    const newToken = generateToken(updatedUser);
 
     res.json({
       msg: 'Membership successfully activated!',
+      token: newToken,
       user: {
         id: updatedUser.id,
         username: updatedUser.username,
         firstName: updatedUser.first_name,
         lastName: updatedUser.last_name,
+        email: updatedUser.username,
         membershipStatus: updatedUser.membership_status,
         isAdmin: updatedUser.is_admin
       }
@@ -158,56 +144,76 @@ router.post('/join-club', async (req, res) => {
 });
 
 // POST /api/auth/login
-router.post('/login', (req, res, next) => {
-  console.log('Login request body:', req.body); // Debug log
-  passport.authenticate('local', (err, user, info) => {
-    if (err) {
-      return next(err); // Handle error (e.g., database error)
+router.post('/login', async (req, res) => {
+  console.log('Login request body:', req.body);
+  const { email, password } = req.body;
+
+  // --- Basic Validation ---
+  if (!email || !password) {
+    return res.status(400).json({ msg: 'Please enter email and password' });
+  }
+
+  try {
+    // --- Find user by email ---
+    const userResult = await db.query(
+      'SELECT id, username, first_name, last_name, password_hash, membership_status, is_admin, created_at FROM users WHERE username = $1',
+      [email]
+    );
+
+    if (userResult.rows.length === 0) {
+      return res.status(401).json({ msg: 'Invalid credentials' });
     }
-    if (!user) {
-      // Authentication failed (e.g., wrong email/password)
-      // info contains the message from LocalStrategy's done(null, false, { message: ... })
-      return res.status(401).json({ msg: info.message || 'Login failed. Please check your credentials.' });
+
+    const user = userResult.rows[0];
+
+    // --- Check password ---
+    const isMatch = await bcrypt.compare(password, user.password_hash);
+    if (!isMatch) {
+      return res.status(401).json({ msg: 'Invalid credentials' });
     }
-    // Authentication successful, establish a session
-    req.logIn(user, (err) => {
-      if (err) {
-        return next(err);
+
+    // --- Generate JWT token ---
+    const token = generateToken(user);
+
+    // --- Send response with token and user data ---
+    res.json({
+      msg: 'Logged in successfully',
+      token,
+      user: {
+        id: user.id,
+        username: user.username,
+        firstName: user.first_name,
+        lastName: user.last_name,
+        email: user.username,
+        membershipStatus: user.membership_status,
+        isAdmin: user.is_admin,
+        createdAt: user.created_at
       }
-      // Session established
-      // Send back user info (excluding sensitive data like password_hash)
-      const { password_hash, ...userWithoutPassword } = user;
-      return res.json({
-        msg: 'Logged in successfully',
-        user: userWithoutPassword
-      });
     });
-  })(req, res, next);
+
+  } catch (err) {
+    console.error('Login error:', err.message);
+    res.status(500).send('Server error during login');
+  }
 });
 
-// GET /api/auth/logout (Example logout route)
-router.get('/logout', (req, res, next) => {
-  req.logout(function(err) { // req.logout requires a callback function
-    if (err) { return next(err); }
-    req.session.destroy((err) => { // Optional: explicitly destroy session
-        if (err) {
-            // Handle error case...
-            console.log("Session destruction error:", err);
-            return res.status(500).json({ msg: "Error logging out" });
-        }
-        res.clearCookie('connect.sid'); // Optional: clear the session cookie if name is known
-        res.json({ msg: 'Logged out successfully' });
-    });
+// GET /api/auth/logout (JWT-based logout - client-side token removal)
+router.post('/logout', (req, res) => {
+  // With JWT, logout is handled client-side by removing the token
+  // Server can optionally maintain a blacklist of tokens (advanced feature)
+  res.json({ 
+    msg: 'Logged out successfully',
+    note: 'Please remove the token from client storage'
   });
 });
 
-// GET /api/auth/status (Example route to check login status
-router.get('/status', async (req, res) => {
-  console.log('Auth status check - isAuthenticated:', req.isAuthenticated());
-  console.log('Auth status check - user:', req.user);
+// GET /api/auth/status (Check authentication status using JWT)
+router.get('/status', optionalAuth, async (req, res) => {
+  console.log('Auth status check - user from JWT:', req.user);
   
-  if (req.isAuthenticated()) { // passport adds isAuthenticated() to the request
-    try {      // Fetch fresh user data from database instead of using session data
+  if (req.user) {
+    try {
+      // Fetch fresh user data from database
       const userResult = await db.query(
         'SELECT id, username, first_name, last_name, membership_status, is_admin, created_at FROM users WHERE id = $1',
         [req.user.id]
@@ -228,7 +234,7 @@ router.get('/status', async (req, res) => {
           username: freshUser.username,
           firstName: freshUser.first_name,
           lastName: freshUser.last_name,
-          email: freshUser.username, // username is the email in our schema
+          email: freshUser.username,
           membershipStatus: freshUser.membership_status,
           isAdmin: freshUser.is_admin,
           createdAt: freshUser.created_at
@@ -254,7 +260,7 @@ router.post('/grant-admin', async (req, res) => {
 
   // --- Validate Admin Passcode ---
   if (adminPasscode !== process.env.ADMIN_PASSCODE) {
-    return res.status(403).json({ msg: 'Invalid admin passcode. Forbidden.' }); // 403 Forbidden for auth-like errors
+    return res.status(403).json({ msg: 'Invalid admin passcode. Forbidden.' });
   }
 
   try {
@@ -275,20 +281,22 @@ router.post('/grant-admin', async (req, res) => {
     const updateResult = await db.query(
       'UPDATE users SET is_admin = TRUE WHERE id = $1 RETURNING id, username, first_name, last_name, membership_status, is_admin',
       [userId]
-    );    const updatedUser = updateResult.rows[0];
+    );
+    
+    const updatedUser = updateResult.rows[0];
 
-    // Update the session with the new user data (safely)
-    if (req.user) {
-      req.user.is_admin = updatedUser.is_admin;
-    }
+    // Generate new token with updated admin status
+    const newToken = generateToken(updatedUser);
 
     res.json({
       msg: 'Admin privileges granted successfully!',
+      token: newToken,
       user: {
         id: updatedUser.id,
         username: updatedUser.username,
         firstName: updatedUser.first_name,
         lastName: updatedUser.last_name,
+        email: updatedUser.username,
         membershipStatus: updatedUser.membership_status,
         isAdmin: updatedUser.is_admin
       }

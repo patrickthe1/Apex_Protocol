@@ -1,18 +1,20 @@
-const ensureAuthenticated = (req, res, next) => {
-  if (req.isAuthenticated()) {
-    return next(); // User is authenticated, proceed to the next middleware/route handler
-  }
-  // User is not authenticated
-  res.status(401).json({ msg: 'Unauthorized. Please log in to access this resource.' });
-};
+const { authenticateToken } = require('../utils/jwt');
 
+const ensureAuthenticated = authenticateToken;
 
 const ensureAdmin = (req, res, next) => {
-  if (req.isAuthenticated() && req.user && req.user.is_admin === true) {
-    return next(); // User is authenticated and is an admin
-  }
-  // User is not an admin or not authenticated
-  res.status(403).json({ msg: 'Forbidden. Admin access required.' });
+  // First authenticate the token
+  authenticateToken(req, res, (err) => {
+    if (err) return; // Error already handled by authenticateToken
+
+    // Check if user is admin
+    if (req.user && req.user.isAdmin === true) {
+      return next(); // User is authenticated and is an admin
+    }
+    
+    // User is not an admin
+    res.status(403).json({ msg: 'Forbidden. Admin access required.' });
+  });
 };
 
 module.exports = { ensureAuthenticated, ensureAdmin };

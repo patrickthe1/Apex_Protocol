@@ -2,6 +2,7 @@ const express = require('express');
 const router = express.Router();
 const db = require('../config/db'); // Your database connection
 const { ensureAuthenticated, ensureAdmin } = require('../middleware/authMiddleware');
+const { optionalAuth } = require('../utils/jwt');
 
 router.post('/',ensureAuthenticated, async (req,res) => {
     const {title,textContent} = req.body;
@@ -41,13 +42,13 @@ router.post('/',ensureAuthenticated, async (req,res) => {
 })
 
 // GET /api/messages - Fetch all messages with conditional author visibility
-router.get('/', async (req, res) => {
+router.get('/', optionalAuth, async (req, res) => {
   try {
     let query;
     let messages;
 
     // Check if user is authenticated and is a member
-    if (req.isAuthenticated() && req.user && req.user.membership_status === true) {
+    if (req.user && req.user.membershipStatus === true) {
       // User is a member: Fetch messages with author details
       query = `
         SELECT 

@@ -16,18 +16,46 @@ export const getApiUrl = (path: string): string => {
   return `${backendUrl}/${cleanPath}`;
 };
 
-// Helper for API requests with proper error handling
+// Token management utilities
+export const getAuthToken = (): string | null => {
+  if (typeof window === 'undefined') return null;
+  return localStorage.getItem('apex_token');
+};
+
+export const setAuthToken = (token: string): void => {
+  if (typeof window === 'undefined') return;
+  localStorage.setItem('apex_token', token);
+};
+
+export const removeAuthToken = (): void => {
+  if (typeof window === 'undefined') return;
+  localStorage.removeItem('apex_token');
+};
+
+// Helper for API requests with JWT authentication
 export const apiRequest = async (path: string, options: RequestInit = {}) => {
   const url = getApiUrl(path);
+  const token = getAuthToken();
   
-  // Ensure credentials are included for session management
+  // Prepare headers with JWT token
+  const defaultHeaders: Record<string, string> = {
+    'Content-Type': 'application/json',
+  };
+
+  // Add Authorization header if token exists
+  if (token) {
+    defaultHeaders['Authorization'] = `Bearer ${token}`;
+  }
+
+  // Merge with any existing headers from options
+  const headers = {
+    ...defaultHeaders,
+    ...(options.headers as Record<string, string>),
+  };
+  
   const defaultOptions: RequestInit = {
-    credentials: 'include',
-    headers: {
-      'Content-Type': 'application/json',
-      ...options.headers,
-    },
     ...options,
+    headers,
   };
   
   try {
