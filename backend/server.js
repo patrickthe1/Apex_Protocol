@@ -47,7 +47,7 @@ app.use(cors({
 // Log CORS configuration for debugging
 console.log('CORS Configuration:');
 console.log('Environment:', process.env.NODE_ENV);
-console.log('Allowed origins:', corsOptions.origin);
+console.log('Allowed origins:', allowedOrigins);
 console.log('Frontend URL from env:', process.env.FRONTEND_URL);
 app.use(express.json());
 app.use(express.urlencoded({extended:false}));
