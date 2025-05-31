@@ -15,22 +15,40 @@ const { ensureAuthenticated } = require('./middleware/authMiddleware'); // If yo
 initializePassport(passport);
 
 // CORS Configuration for production deployment
-const corsOptions = {
-  origin: process.env.NODE_ENV === 'production' 
-    ? [process.env.FRONTEND_URL || 'https://apex-protocol.netlify.app'] // Use environment variable with fallback
-    : ['http://localhost:3000', 'http://127.0.0.1:3000'],
-  credentials: true, // Allow cookies/session to be sent
+// Backend server.js CORS debug
+const allowedOrigins = [
+  'http://localhost:3000',  // Development
+  process.env.FRONTEND_URL, // Should be your Netlify URL
+  'https://683a1ac4c7e8a000088f1549--apex-protocol-frontend.netlify.app' // Your actual Netlify URL
+];
+
+console.log('🔍 CORS Debug - Allowed Origins:', allowedOrigins);
+console.log('🔍 CORS Debug - FRONTEND_URL env var:', process.env.FRONTEND_URL);
+
+app.use(cors({
+  origin: function (origin, callback) {
+    console.log('🔍 CORS Debug - Request origin:', origin);
+    
+    if (!origin) return callback(null, true);
+    
+    if (allowedOrigins.indexOf(origin) !== -1) {
+      console.log('✅ CORS - Origin allowed:', origin);
+      callback(null, true);
+    } else {
+      console.log('❌ CORS - Origin blocked:', origin);
+      callback(new Error('Not allowed by CORS'));
+    }
+  },
+  credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With']
-};
+  allowedHeaders: ['Content-Type', 'Authorization', 'Cookie'],
+}));
 
 // Log CORS configuration for debugging
 console.log('CORS Configuration:');
 console.log('Environment:', process.env.NODE_ENV);
 console.log('Allowed origins:', corsOptions.origin);
 console.log('Frontend URL from env:', process.env.FRONTEND_URL);
-
-app.use(cors(corsOptions));
 app.use(express.json());
 app.use(express.urlencoded({extended:false}));
 
@@ -58,6 +76,20 @@ app.use('/api/test', testRoutes);
 
 app.use('/api/auth', authRoutes);
 app.use('/api/messages',messageRoutes);
+
+// Add this to server.js temporarily for debugging
+app.get('/api/cors-test', (req, res) => {
+  res.json({
+    message: 'CORS test successful',
+    origin: req.headers.origin,
+    allowedOrigins: [
+      'http://localhost:3000',
+      process.env.FRONTEND_URL,
+      'https://683a1ac4c7e8a000088f1549--apex-protocol-frontend.netlify.app'
+    ],
+    frontendUrl: process.env.FRONTEND_URL
+  });
+});
 
 app.listen(port, () => {
   console.log(`Server running on port ${port}`);
