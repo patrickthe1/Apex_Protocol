@@ -15,12 +15,12 @@ const { ensureAuthenticated } = require('./middleware/authMiddleware'); // If yo
 initializePassport(passport);
 
 // CORS Configuration for production deployment
-// Backend server.js CORS debug
 const allowedOrigins = [
   'http://localhost:3000',  // Development
-  process.env.FRONTEND_URL, // Should be your Netlify URL
-  'https://683a1ac4c7e8a000088f1549--apex-protocol-frontend.netlify.app' // Your actual Netlify URL
-];
+  'https://apex-protocol-frontend.netlify.app',  // Current frontend URL (no trailing slash)
+  'https://683a1ac4c7e8a000088f1549--apex-protocol-frontend.netlify.app', // Backup URL
+  process.env.FRONTEND_URL?.replace(/\/$/, ''), // Remove trailing slash from env var
+].filter(Boolean);
 
 console.log('🔍 CORS Debug - Allowed Origins:', allowedOrigins);
 console.log('🔍 CORS Debug - FRONTEND_URL env var:', process.env.FRONTEND_URL);
@@ -31,17 +31,19 @@ app.use(cors({
     
     if (!origin) return callback(null, true);
     
-    if (allowedOrigins.indexOf(origin) !== -1) {
+    if (allowedOrigins.includes(origin)) {
       console.log('✅ CORS - Origin allowed:', origin);
       callback(null, true);
     } else {
       console.log('❌ CORS - Origin blocked:', origin);
-      callback(new Error('Not allowed by CORS'));
+      console.log('❌ Allowed origins are:', allowedOrigins);
+      callback(new Error(`Not allowed by CORS. Origin: ${origin}`));
     }
   },
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization', 'Cookie'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'Cookie', 'Accept'],
+  optionsSuccessStatus: 200
 }));
 
 // Log CORS configuration for debugging
